@@ -23,3 +23,14 @@ Da impostare a mano su ogni dispositivo, **mai nel repository**:
 
 - `FERDISCOPE_URL`: sul VPS `http://localhost:3010`, altrove `https://www.edicolain.it/ferdiscope`
 - `FERDISCOPE_TOKEN`: lo digita Ferdi (`setx` su Windows, `~/.bashrc` o `/etc/environment` sul VPS)
+
+### File di riserva `~/.ferdiscope.json`
+
+Se le variabili mancano (per esempio in un terminale aperto prima di `setx`), gli hook leggono
+`~/.ferdiscope.json` (oppure il percorso in `FERDISCOPE_CONFIG`):
+
+```json
+{ "url": "https://www.edicolain.it/ferdiscope", "token": "..." }
+```
+
+Le variabili vincono sul file, campo per campo. Il file sta solo nella home del dispositivo, **mai nel repository**.

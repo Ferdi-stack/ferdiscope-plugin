@@ -5,6 +5,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 
 const NOME_SEGNAPOSTO = '.ferdiscope';
 const TIMEOUT_MS = 3000;
@@ -41,10 +42,39 @@ function trovaSegnaposto(dir) {
   }
 }
 
-function config(env) {
+// File di riserva quando mancano le variabili d'ambiente (es. terminale aperto
+// prima di `setx`): JSON {"url": "...", "token": "..."}. Percorso da
+// FERDISCOPE_CONFIG, altrimenti ~/.ferdiscope.json.
+function percorsoConfig(env) {
   const e = env || {};
-  const url = typeof e.FERDISCOPE_URL === 'string' ? e.FERDISCOPE_URL.trim().replace(/\/+$/, '') : '';
-  const token = typeof e.FERDISCOPE_TOKEN === 'string' ? e.FERDISCOPE_TOKEN.trim() : '';
+  const p = typeof e.FERDISCOPE_CONFIG === 'string' ? e.FERDISCOPE_CONFIG.trim() : '';
+  return p || path.join(os.homedir(), '.ferdiscope.json');
+}
+
+function leggiFileConfig(file) {
+  try {
+    const dati = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+    return dati && typeof dati === 'object' ? dati : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function testo(v) {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+// Le variabili d'ambiente vincono; il file copre solo i campi che mancano.
+function config(env, file) {
+  const e = env || {};
+  let url = testo(e.FERDISCOPE_URL);
+  let token = testo(e.FERDISCOPE_TOKEN);
+  if (!url || !token) {
+    const f = leggiFileConfig(file || percorsoConfig(e));
+    if (!url) url = testo(f.url);
+    if (!token) token = testo(f.token);
+  }
+  url = url.replace(/\/+$/, '');
   return { url: url || null, token: token || null };
 }
 
@@ -168,6 +198,7 @@ module.exports = {
   TIMEOUT_MS,
   trovaSegnaposto,
   config,
+  percorsoConfig,
   eLocale,
   chiediContesto,
   inoltraEvento,

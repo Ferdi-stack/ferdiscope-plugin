@@ -1,6 +1,6 @@
 {
   "name": "ferdiscope",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Memoria FerdiScope in tutte le sessioni di Claude Code",
   "author": {
     "name": "Ferdi-stack"

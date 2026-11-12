@@ -20,6 +20,8 @@ function ambiente(extra) {
   const env = { ...process.env };
   delete env.FERDISCOPE_URL;
   delete env.FERDISCOPE_TOKEN;
+  // Nemmeno il file di riserva vero: si punta a un percorso che non esiste.
+  env.FERDISCOPE_CONFIG = path.join(os.tmpdir(), 'ferdiscope-test-assente', 'nessuno.json');
   return { ...env, ...extra };
 }
 

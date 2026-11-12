@@ -57,11 +57,44 @@ test('trovaSegnaposto con input non valido restituisce null', () => {
 // --- config ---
 
 test('config toglie la / finale e legge il token', () => {
-  assert.strictEqual(lib.config({ FERDISCOPE_URL: 'https://x/ferdiscope/' }).url, 'https://x/ferdiscope');
-  assert.deepStrictEqual(lib.config({ FERDISCOPE_URL: 'http://localhost:3010', FERDISCOPE_TOKEN: 'abc' }),
+  const nessunFile = path.join(cartellaTmp(), 'assente.json');
+  assert.strictEqual(lib.config({ FERDISCOPE_URL: 'https://x/ferdiscope/' }, nessunFile).url, 'https://x/ferdiscope');
+  assert.deepStrictEqual(lib.config({ FERDISCOPE_URL: 'http://localhost:3010', FERDISCOPE_TOKEN: 'abc' }, nessunFile),
     { url: 'http://localhost:3010', token: 'abc' });
-  assert.deepStrictEqual(lib.config({}), { url: null, token: null });
-  assert.deepStrictEqual(lib.config({ FERDISCOPE_URL: '  ', FERDISCOPE_TOKEN: '' }), { url: null, token: null });
+  assert.deepStrictEqual(lib.config({}, nessunFile), { url: null, token: null });
+  assert.deepStrictEqual(lib.config({ FERDISCOPE_URL: '  ', FERDISCOPE_TOKEN: '' }, nessunFile), { url: null, token: null });
+});
+
+test('config: senza variabili legge il file di riserva', () => {
+  const file = path.join(cartellaTmp(), '.ferdiscope.json');
+  fs.writeFileSync(file, JSON.stringify({ url: 'https://y/ferdiscope/', token: ' tok ' }));
+  assert.deepStrictEqual(lib.config({}, file), { url: 'https://y/ferdiscope', token: 'tok' });
+});
+
+test('config: le variabili vincono sul file, campo per campo', () => {
+  const file = path.join(cartellaTmp(), '.ferdiscope.json');
+  fs.writeFileSync(file, JSON.stringify({ url: 'https://file', token: 'dal-file' }));
+  assert.deepStrictEqual(lib.config({ FERDISCOPE_URL: 'https://env' }, file), { url: 'https://env', token: 'dal-file' });
+});
+
+test('config: file rotto o con campi sbagliati non lancia', () => {
+  const dir = cartellaTmp();
+  const rotto = path.join(dir, 'rotto.json');
+  fs.writeFileSync(rotto, '{ non è json');
+  assert.deepStrictEqual(lib.config({}, rotto), { url: null, token: null });
+  const strano = path.join(dir, 'strano.json');
+  fs.writeFileSync(strano, JSON.stringify({ url: 42, token: ['x'] }));
+  assert.deepStrictEqual(lib.config({}, strano), { url: null, token: null });
+  const conBom = path.join(dir, 'bom.json');
+  fs.writeFileSync(conBom, '﻿' + JSON.stringify({ url: 'https://z', token: 't' }));
+  assert.deepStrictEqual(lib.config({}, conBom), { url: 'https://z', token: 't' });
+});
+
+test('config: il percorso del file viene da FERDISCOPE_CONFIG, altrimenti dalla home', () => {
+  const file = path.join(cartellaTmp(), 'altro.json');
+  fs.writeFileSync(file, JSON.stringify({ url: 'https://da-config', token: 't' }));
+  assert.deepStrictEqual(lib.config({ FERDISCOPE_CONFIG: file }), { url: 'https://da-config', token: 't' });
+  assert.strictEqual(lib.percorsoConfig({}), path.join(os.homedir(), '.ferdiscope.json'));
 });
 
 // --- chiediContesto ---
