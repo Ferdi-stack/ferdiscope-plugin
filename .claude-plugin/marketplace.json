@@ -1,0 +1,14 @@
+{
+  "name": "ferdi-stack",
+  "description": "Plugin di Ferdi-stack",
+  "owner": {
+    "name": "Ferdi-stack"
+  },
+  "plugins": [
+    {
+      "name": "ferdiscope",
+      "source": "./plugins/ferdiscope",
+      "description": "Memoria FerdiScope in tutte le sessioni di Claude Code"
+    }
+  ]
+}
