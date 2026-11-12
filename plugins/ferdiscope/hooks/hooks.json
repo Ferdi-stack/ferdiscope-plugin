@@ -1,12 +1,50 @@
 {
+  "description": "Memoria FerdiScope: indici all'avvio, inoltro degli eventi",
   "hooks": {
     "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prova.js\"",
-            "timeout": 10
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/forward.js\"",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/forward.js\"",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/forward.js\"",
+            "async": true,
+            "timeout": 5
           }
         ]
       }
