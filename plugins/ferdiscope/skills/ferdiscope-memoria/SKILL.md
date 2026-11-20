@@ -1,13 +1,13 @@
 ---
 name: ferdiscope-memoria
-description: Da usare quando si legge o si aggiorna la memoria FerdiScope di un progetto (chiavi indice, area, storia; righe [F] [P] [I] [?] [D] [S]), quando si dichiara finito un lavoro, o quando il contesto di avvio dice che il progetto non ha ancora indice e aree.
+description: Da usare quando si legge o si aggiorna la memoria FerdiScope di un progetto (chiavi indice, area, storia; righe [F] [P] [I] [?] [D] [S]), quando Ferdi chiude la sessione o chiede di aggiornarla, o quando il contesto di avvio dice che il progetto non ha ancora indice e aree.
 ---
 
 # Memoria FerdiScope
 
 ## In breve
 
-FerdiScope tiene, per ogni progetto, un **indice** e delle **aree** fatte di righe tipizzate. All'avvio l'hook del plugin mette nel contesto le regole, `## indice:globale` e `## indice:<progetto>`. Le aree non sono caricate: si leggono una alla volta quando il lavoro le tocca. A fine lavoro si correggono le righe dell'area, non si aggiungono resoconti.
+FerdiScope tiene, per ogni progetto, un **indice** e delle **aree** fatte di righe tipizzate. All'avvio l'hook del plugin mette nel contesto le regole, `## indice:globale` e `## indice:<progetto>`. Le aree non sono caricate: si leggono, tutte insieme, quando il lavoro le tocca. La memoria si aggiorna **una volta per sessione**, correggendo le righe dell'area, non aggiungendo resoconti.
 
 ## Chiavi
 
@@ -18,11 +18,27 @@ FerdiScope tiene, per ogni progetto, un **indice** e delle **aree** fatte di rig
 | `area:<progetto>:<area>` | sezioni Cosa copre / Stato / Trappole / Decisioni / Da fare | quando il lavoro tocca quell'area |
 | `storia:<progetto>:<area>` | righe `[S data]` che non valgono più | **mai di default**: solo se serve capire il passato |
 
-## Strumenti (connettore claude.ai FerdiScope)
+## Strumenti (server MCP FerdiScope)
 
-- `mcp__claude_ai_FerdiScope__get_memory_entry(project_name, key)`: legge una chiave. È il modo normale di leggere.
-- `mcp__claude_ai_FerdiScope__set_project_memory(project_name, key, value)`: sostituisce **tutto** il valore della chiave. `value` è una stringa di testo.
-- `get_project_memory`: scarica tutta la memoria. Sui progetti grandi supera il limite di una risposta: non usarlo. Per sapere se una chiave esiste, `get_memory_entry` su quella chiave.
+I nomi sono gli stessi sul connettore claude.ai (`mcp__claude_ai_FerdiScope__…`) e su quello locale (`mcp__ferdiscope__…`).
+
+**Leggere**
+- `get_memory_entries(project_name, keys[])`: legge più chiavi in una chiamata. È il modo normale di leggere: le chiavi che servono si chiedono tutte insieme. Una chiave che non c'è torna come `(not found)`.
+- `get_memory_entry(project_name, key)`: una chiave sola.
+- `get_project_memory`: scarica tutta la memoria. Sui progetti grandi supera il limite di una risposta: non usarlo.
+
+**Scrivere**
+- `edit_memory(project_name, edits[])`: cambia **singole righe** di chiavi che esistono già. È il modo normale di aggiornare. Ogni elemento di `edits` è `{ key, ops: [...] }`; le operazioni:
+  - `{ op: "replace", match, line }`: sostituisce la riga che contiene `match`;
+  - `{ op: "add", section, line }`: aggiunge in fondo alla sezione (`section` = titolo senza `##`, es. `"Trappole"`); con `after: "<testo>"` la mette dopo quella riga; senza nessuno dei due, in fondo alla chiave;
+  - `{ op: "to_history", match, note }`: toglie la riga dall'area e la aggiunge in `storia:<progetto>:<area>` come `[S oggi] <riga> → <note>` (crea la storia se manca; `date` facoltativa);
+  - `{ op: "remove", match }`: toglie una riga (per i doppioni; ciò che non è più vero va con `to_history`).
+
+  `match` è un pezzo di testo che deve stare in **una sola** riga (della sezione, se dai `section`): scegline uno distintivo, per esempio il comando di verifica o le prime parole. Se una riga non si trova, o se ne trovano due, non viene scritto niente e la risposta dice perché: correggi `match` e rimanda tutto. Le modifiche partono dal valore salvato in quel momento, quindi non cancellano ciò che un altro dispositivo ha scritto nel frattempo. La risposta contiene il testo risultante di ogni chiave (o solo le lunghezze con `echo: "none"`) e le righe aggiunte in storia.
+- `set_project_memory(project_name, key, value)`: sostituisce **tutto** il valore. Serve solo per creare una chiave nuova o per ristrutturarla davvero.
+- `set_memory_entries(project_name, entries[])`: come sopra per più chiavi, in una transazione.
+
+Tutte le scritture rispondono con tipo e lunghezza del valore salvato (`text, N chars`). Se il tipo non è `text`, la risposta lo segnala: riscrivi e avvisa Ferdi. **Non serve rileggere** dopo aver scritto.
 
 Il token di FerdiScope e ogni altra credenziale non passano dall'assistente: li digita Ferdi.
 
@@ -39,22 +55,24 @@ Il token di FerdiScope e ogni altra credenziale non passano dall'assistente: li 
 
 Un `[F]` si scrive solo con un comando di verifica che si può rilanciare, e solo se tutta la riga l'hai verificata tu in questa sessione. Ciò che non hai verificato resta senza `[F]` (o è un `[?]`). Le date sono quelle di oggi in Europe/Rome.
 
-## A fine lavoro: aggiornare l'area
+## Aggiornare la memoria: una volta per sessione
 
-Quando dichiari un lavoro finito, aggiorna da solo, senza chiedere prima, anche se Ferdi sta chiudendo (prima di salutarlo):
+**Quando.** Una volta sola, quando Ferdi chiude la sessione (saluta, dice che ha finito, che per oggi basta) o te lo chiede. Non a ogni lavoro finito né a ogni giro di correzioni: se nella stessa sessione rifai due volte la stessa area, la scrivi una volta, con lo stato finale. Lo fai da solo, senza chiedere prima, prima di salutarlo. Se dopo l'aggiornamento cambia ancora qualcosa, una sola `edit_memory` con le righe in più.
 
-1. `get_memory_entry` dell'area toccata (se non l'hai già letta in sessione: rileggila comunque, potrebbe averla scritta un altro dispositivo).
-2. Cambia solo le righe che il lavoro ha cambiato:
-   - fatto corretto o riverificato → stessa riga con data nuova;
-   - trappola scoperta (cosa che farebbe sbagliare il prossimo) → riga nuova in Trappole;
-   - decisione presa da Ferdi in sessione → `[D]`;
-   - ciò che non è più vero → toglilo dall'area e mettilo in `storia:<progetto>:<area>` come `[S AAAA-MM-GG] <vecchia riga> → <cosa è cambiato>`.
+**Come.**
+1. Le aree toccate le hai già lette all'inizio del lavoro. Se no, leggile ora con **una** `get_memory_entries`. Non serve rileggerle per paura di un altro dispositivo: `edit_memory` parte dal valore salvato.
+2. Per ogni riga che il lavoro ha cambiato, un'operazione:
+   - fatto corretto o riverificato → `replace` della stessa riga con data nuova;
+   - trappola scoperta (cosa che farebbe sbagliare il prossimo) → `add` in `Trappole`;
+   - decisione presa da Ferdi in sessione → `add` di una `[D]` in `Decisioni`;
+   - ciò che non è più vero → `to_history` con `note` = cosa è cambiato (mai cancellarlo).
 
    Tieni la forma che l'area ha già (sezioni o elenco): non ristrutturarla.
-3. Se tocchi la storia, scrivila **prima** dell'area: `get_memory_entry`, aggiungi in fondo, `set_project_memory` intera (se la chiave non esiste, la crei con la sola riga nuova). Poi `set_project_memory` con l'area **intera** (tutte le righe, anche quelle non toccate).
-4. Rileggi con `get_memory_entry` ogni chiave scritta e controlla che torni **testo** uguale a quello scritto. Una volta un valore è finito salvato come oggetto di byte (Buffer): se succede, riscrivi e avvisa Ferdi.
-5. L'`indice:<progetto>` solo se cambia qualcosa che vale per tutto il progetto (stato, area nuova).
-6. Dillo a Ferdi in **una riga**: quali chiavi e cosa è cambiato.
+3. Manda **tutte** le modifiche, di tutte le aree, in **una** `edit_memory`. L'`indice:<progetto>` entra nella stessa chiamata solo se cambia qualcosa che vale per tutto il progetto (stato, area nuova).
+4. Non rileggere: la risposta di `edit_memory` è già il testo salvato.
+5. Dillo a Ferdi in **una riga**: quali chiavi e cosa è cambiato.
+
+Area nuova (o progetto senza aree): crea le chiavi con `set_memory_entries`, tutte in una chiamata.
 
 Se il lavoro contraddice una `[D]`: la `[D]` resta com'è, aggiungi un `[?]` e dillo a Ferdi nella stessa riga.
 
@@ -70,7 +88,7 @@ Il contesto lo dice ("non ha ancora indice e aree"). Allora:
    - **aree**: nomi in minuscolo con trattini, 4-10 parti del progetto che si lavorano separatamente, ciascuna con Cosa copre / Stato / Trappole / Decisioni / Da fare, più `metodo` (come si lavora: test, deploy, git);
    - **indice**: stato in una riga ed elenco delle aree;
    - le prepari tu; a Ferdi vanno **solo le domande** che il codice non risolve: scritte come righe `[?]` e mandate tutte insieme in un messaggio. Non chiedergli di dettare o confermare riga per riga.
-3. Scrivi con `set_project_memory` una chiave alla volta, rileggi ognuna (passo 4 sopra), riassumi in una riga.
+3. Scrivi tutte le chiavi con **una** `set_memory_entries` (la risposta dice tipo e lunghezza di ognuna: niente riletture), riassumi in una riga.
 
 Se il contesto dice invece che il progetto **non è registrato** in FerdiScope: dillo in una riga e basta. Il plugin non crea progetti da solo.
 
@@ -90,7 +108,10 @@ Il file `.ferdiscope` nella cartella radice contiene una riga: il nome del proge
 | Usare un `[F]` scaduto come vero | Rilanciare la verifica, poi usarlo |
 | Trattare `[P]`/`[I]` come fatti | Sono possibilità e intenzioni |
 | Cancellare una riga non più vera | Spostarla in `storia:` come `[S data]` |
-| Scrivere solo le righe nuove con `set_project_memory` | Scrivere l'area intera: la chiave viene sostituita |
-| Fidarsi della scrittura senza rileggere | `get_memory_entry` e controllare che sia testo |
+| Riscrivere un'area intera con `set_project_memory` per cambiare qualche riga | `edit_memory` con le sole righe cambiate |
+| Scrivere solo le righe nuove con `set_project_memory` | La chiave viene sostituita: per le righe c'è `edit_memory` |
+| Rileggere una chiave dopo averla scritta | La risposta della scrittura dice già cosa è stato salvato |
+| Aggiornare la stessa area a ogni giro di lavoro | Una volta, quando Ferdi chiude o lo chiede |
+| Leggere le aree una chiamata alla volta | Una `get_memory_entries` con tutte le chiavi |
 | `get_project_memory` per "vedere cosa c'è" | `get_memory_entry` della chiave che serve |
 | Leggere tutte le aree o la storia all'avvio | Solo l'area che il lavoro tocca |

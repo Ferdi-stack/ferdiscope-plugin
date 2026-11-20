@@ -221,7 +221,8 @@ test('testoContesto con ctx null: solo la riga "non disponibile"', () => {
 test('testoContesto con progetto e indice: regole, indice globale, indice del progetto', () => {
   const t = lib.testoContesto({ progetto: 'Edicola In', registrato: true, globale: 'GLOB', indice: 'IND' }, 'Edicola In');
   assert.ok(t.startsWith(lib.REGOLE), 'comincia con le regole');
-  assert.ok(t.includes("get_memory_entry(progetto, 'area:<progetto>:<area>')"));
+  assert.ok(t.includes('get_memory_entries(progetto,'));
+  assert.ok(t.includes('edit_memory'));
   assert.ok(t.includes('Dettagli: skill ferdiscope-memoria.'));
   const iG = t.indexOf('## indice:globale\nGLOB');
   const iP = t.indexOf('## indice:Edicola In\nIND');

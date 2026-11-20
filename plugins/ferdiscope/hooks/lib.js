@@ -14,9 +14,10 @@ const NON_DISPONIBILE =
   'Memoria FerdiScope non disponibile in questa sessione (server o token mancanti): lavora normalmente.';
 
 const REGOLE =
-  "Le aree non sono caricate: leggile con `get_memory_entry(progetto, 'area:<progetto>:<area>')` quando il lavoro le tocca. " +
-  "Quando dichiari un lavoro finito aggiorna da solo l'area (solo le righe cambiate, ciò che non è più vero va in `storia:`, " +
-  "le [D] non si toccano, l'indice solo se cambia qualcosa per tutto il progetto) e dillo in una riga. " +
+  "Le aree non sono caricate: quando il lavoro le tocca leggile tutte insieme con `get_memory_entries(progetto, ['area:<progetto>:<area>', ...])`. " +
+  "Aggiorna la memoria una volta sola, quando Ferdi chiude la sessione o te lo chiede (non a ogni lavoro finito): " +
+  "con `edit_memory` cambi solo le righe cambiate (ciò che non è più vero va in `storia:` con `to_history`, le [D] non si toccano, " +
+  "l'indice solo se cambia qualcosa per tutto il progetto), non rileggi dopo aver salvato, e lo dici in una riga. " +
   'Dettagli: skill ferdiscope-memoria.';
 
 // Risale da `dir` fino alla radice del disco cercando `.ferdiscope`.
