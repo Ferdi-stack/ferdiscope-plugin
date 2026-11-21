@@ -252,3 +252,53 @@ test('testoContesto con cartella che non è un progetto: solo regole e indice gl
   const t = lib.testoContesto({ progetto: null, registrato: false, globale: 'GLOB', indice: null }, null);
   assert.strictEqual(t, lib.REGOLE + '\n\n## indice:globale\nGLOB');
 });
+
+// --- inoltraEvento ---
+
+test('inoltraEvento verso URL non locale senza token: false senza richiesta', async () => {
+  const t0 = Date.now();
+  assert.strictEqual(await lib.inoltraEvento({ url: 'https://192.0.2.1', token: null }, { a: 1 }), false);
+  assert.ok(Date.now() - t0 < 200);
+});
+
+test('inoltraEvento verso URL non locale in http, anche con token: false senza richiesta', async () => {
+  const t0 = Date.now();
+  assert.strictEqual(await lib.inoltraEvento({ url: 'http://192.0.2.1', token: 'segreto' }, { a: 1 }), false);
+  assert.strictEqual(await lib.chiediContesto({ url: 'http://192.0.2.1', token: 'segreto' }, {}), null);
+  assert.ok(Date.now() - t0 < 200);
+});
+
+test('destinazioneAmmessa: locale sempre, altrove solo https con token', () => {
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'http://localhost:3010', token: null }), true);
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'http://127.0.0.1:3010', token: 'x' }), true);
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'https://www.edicolain.it/ferdiscope', token: 'x' }), true);
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'https://www.edicolain.it/ferdiscope', token: null }), false);
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'http://www.edicolain.it/ferdiscope', token: 'x' }), false);
+  assert.strictEqual(lib.destinazioneAmmessa({ url: 'non un url', token: 'x' }), false);
+  assert.strictEqual(lib.destinazioneAmmessa(null), false);
+});
+
+test('inoltraEvento verso localhost: manda l\'evento con segreti mascherati e campi lunghi tagliati', async () => {
+  const srv = await avviaServer((req, res) => { res.writeHead(200); res.end('{}'); });
+  try {
+    const sk = 'sk-' + 'ant-api03-' + 'zzzzzzzzzzzzzzzzzzzz';
+    const evento = { tool_name: 'Bash', tool_input: { command: `export ANTHROPIC_API_KEY=${sk}` }, tool_response: { stdout: 'r'.repeat(300) } };
+    const ok = await lib.inoltraEvento({ url: `http://127.0.0.1:${srv.porta}`, token: null }, evento, 3000, 100);
+    assert.strictEqual(ok, true);
+    const inviato = JSON.parse(srv.richieste[0].corpo);
+    assert.ok(!srv.richieste[0].corpo.includes(sk));
+    assert.strictEqual(inviato.tool_input.command, 'export ANTHROPIC_API_KEY=[MASCHERATO:sk-ant]');
+    assert.match(inviato.tool_response.stdout, /^r{100}\n…\[troncato da FerdiScope: 300 caratteri\]$/);
+    assert.strictEqual(evento.tool_response.stdout.length, 300);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('maxCampo: default 20000, FERDISCOPE_MAX_CAMPO lo cambia, valori non validi ignorati', () => {
+  assert.strictEqual(lib.maxCampo({}), 20000);
+  assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: '500' }), 500);
+  assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: '0' }), 0);
+  assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: 'abc' }), 20000);
+  assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: '-3' }), 20000);
+});

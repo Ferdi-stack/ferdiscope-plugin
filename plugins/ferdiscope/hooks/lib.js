@@ -6,9 +6,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { mascheraValore, troncaCampi } = require('./maschera.js');
 
 const NOME_SEGNAPOSTO = '.ferdiscope';
 const TIMEOUT_MS = 3000;
+// Tetto per ogni campo di testo dell'evento inoltrato (FERDISCOPE_MAX_CAMPO per cambiarlo, 0 = nessun tetto).
+const MAX_CAMPO_DEFAULT = 20000;
 
 const NON_DISPONIBILE =
   'Memoria FerdiScope non disponibile in questa sessione (server o token mancanti): lavora normalmente.';
@@ -89,6 +92,28 @@ function eLocale(url) {
   }
 }
 
+// Il token parte solo verso la stessa macchina o in https; verso un URL non
+// locale serve il token (senza, il server risponderebbe comunque 401).
+function destinazioneAmmessa(cfg) {
+  try {
+    if (!cfg || !cfg.url) return false;
+    if (eLocale(cfg.url)) return true;
+    return Boolean(cfg.token) && new URL(cfg.url).protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
+function maxCampo(env) {
+  const v = parseInt((env || {}).FERDISCOPE_MAX_CAMPO, 10);
+  return Number.isFinite(v) && v >= 0 ? v : MAX_CAMPO_DEFAULT;
+}
+
+// Copia dell'evento pronta per l'invio: segreti mascherati, poi campi lunghi tagliati.
+function preparaEvento(evento, max = MAX_CAMPO_DEFAULT) {
+  return troncaCampi(mascheraValore(evento), max);
+}
+
 function intestazioni(cfg, extra) {
   const h = { ...(extra || {}) };
   if (cfg.token) h.Authorization = `Bearer ${cfg.token}`;
@@ -108,12 +133,11 @@ async function chiamata(url, opzioni, timeoutMs) {
   }
 }
 
-// GET <url>/api/context. null su: URL mancante, token mancante verso un URL
-// non locale (nessuna richiesta), errore di rete, timeout, stato non 2xx, JSON non valido.
+// GET <url>/api/context. null su: URL mancante, URL non locale senza token o
+// non https (nessuna richiesta), errore di rete, timeout, stato non 2xx, JSON non valido.
 async function chiediContesto(cfg, dati, timeoutMs = TIMEOUT_MS) {
   try {
-    if (!cfg || !cfg.url) return null;
-    if (!cfg.token && !eLocale(cfg.url)) return null;
+    if (!destinazioneAmmessa(cfg)) return null;
     const { cwd, project, root } = dati || {};
     const parti = [];
     if (cwd) parti.push('cwd=' + encodeURIComponent(cwd));
@@ -129,14 +153,16 @@ async function chiediContesto(cfg, dati, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-// POST <url>/hooks con l'evento. Non lancia mai; restituisce true se il server ha risposto 2xx.
-async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS) {
+// POST <url>/hooks con l'evento, dopo preparaEvento (segreti mascherati, campi
+// lunghi tagliati). Niente richiesta verso URL non locali senza token o non https.
+// Non lancia mai; restituisce true se il server ha risposto 2xx.
+async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS, max = MAX_CAMPO_DEFAULT) {
   try {
-    if (!cfg || !cfg.url) return false;
+    if (!destinazioneAmmessa(cfg)) return false;
     const r = await chiamata(`${cfg.url}/hooks`, {
       method: 'POST',
       headers: intestazioni(cfg, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify(evento),
+      body: JSON.stringify(preparaEvento(evento, max)),
     }, timeoutMs);
     return r.ok;
   } catch (e) {
@@ -201,6 +227,10 @@ module.exports = {
   config,
   percorsoConfig,
   eLocale,
+  destinazioneAmmessa,
+  maxCampo,
+  preparaEvento,
+  MAX_CAMPO_DEFAULT,
   chiediContesto,
   inoltraEvento,
   testoContesto,

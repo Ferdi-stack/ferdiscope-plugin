@@ -197,3 +197,22 @@ test('forward verso un server che non risponde: esce 0 entro ~3,5 s', async () =
     await srv.chiudi();
   }
 });
+
+test('forward: segreti mascherati e campi oltre FERDISCOPE_MAX_CAMPO tagliati prima dell\'invio', async () => {
+  const srv = await avviaServer((req, res) => { res.writeHead(200); res.end('{}'); });
+  try {
+    const gh = 'ghp' + '_' + 'abcdefghijABCDEFGHIJ0123456789abcdef';
+    const evento = { session_id: 's3', cwd: os.tmpdir(), hook_event_name: 'PostToolUse', tool_name: 'Read',
+      tool_response: { file: { content: `GITHUB_TOKEN=${gh}\n` + 'z'.repeat(5000) } } };
+    const r = await esegui(FORWARD, JSON.stringify(evento), ambiente({ FERDISCOPE_URL: `http://127.0.0.1:${srv.porta}`, FERDISCOPE_MAX_CAMPO: '1000' }));
+    assert.strictEqual(r.codice, 0);
+    const corpo = srv.richieste[0].corpo;
+    assert.ok(!corpo.includes(gh));
+    const c = JSON.parse(corpo).tool_response.file.content;
+    assert.ok(c.startsWith('GITHUB_TOKEN=[MASCHERATO:github]\n'));
+    assert.match(c, /\n…\[troncato da FerdiScope: \d+ caratteri\]$/);
+    assert.ok(c.length < 1100);
+  } finally {
+    await srv.chiudi();
+  }
+});

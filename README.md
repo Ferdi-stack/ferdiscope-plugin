@@ -2,10 +2,10 @@
 
 Marketplace `ferdi-stack` con il plugin `ferdiscope`: porta la memoria di FerdiScope in ogni sessione di Claude Code (PC, portatile, VPS).
 
-Versione 0.1.2:
+Versione 0.1.4:
 
 - `hooks/session-start.js` (SessionStart): chiede `GET <FERDISCOPE_URL>/api/context` e passa a Claude le regole, `indice:globale` e `indice:<progetto>`. Se FerdiScope non risponde entro 3 s, o manca il token verso un URL non locale, passa una riga "memoria FerdiScope non disponibile".
-- `hooks/forward.js` (PreToolUse, PostToolUse, Stop, in background): inoltra l'evento a `POST <FERDISCOPE_URL>/hooks`, aggiungendo `ferdiscope_project` quando la cartella sta sotto un segnaposto `.ferdiscope`.
+- `hooks/forward.js` (PreToolUse, PostToolUse, Stop, in background): inoltra l'evento a `POST <FERDISCOPE_URL>/hooks`, aggiungendo `ferdiscope_project` quando la cartella sta sotto un segnaposto `.ferdiscope`. Prima dell'invio maschera i segreti (`hooks/maschera.js`) e taglia i campi di testo oltre `FERDISCOPE_MAX_CAMPO` caratteri (default 20000); verso URL non locali parte solo con token e in https.
 - Segnaposto `.ferdiscope`: un file di una riga con il nome del progetto in FerdiScope, nella cartella radice del progetto (niente segreti).
 
 Test: `node --test plugins/ferdiscope/tests/*.test.js`
