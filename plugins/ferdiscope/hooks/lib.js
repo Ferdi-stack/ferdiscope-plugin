@@ -170,7 +170,8 @@ async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS, max = MAX_CAMP
   }
 }
 
-function testoContesto(ctx, nomeSegnaposto) {
+// opzioni.sessioni: aggiunge ultime sessioni e filoni (solo all'avvio vero, non su resume/compact).
+function testoContesto(ctx, nomeSegnaposto, opzioni = {}) {
   if (!ctx || typeof ctx !== 'object') return NON_DISPONIBILE;
   const parti = [REGOLE];
   if (ctx.globale) parti.push(`## indice:globale\n${ctx.globale}`);
@@ -183,8 +184,80 @@ function testoContesto(ctx, nomeSegnaposto) {
     } else {
       parti.push(`Il progetto "${p}" non ha ancora indice e aree: dillo in una riga e proponi di prepararli (skill ferdiscope-memoria), poi lavora normalmente.`);
     }
+    if (opzioni.sessioni) {
+      const s = testoSessioni(ctx, opzioni.ora);
+      if (s) parti.push(s);
+    }
   }
   return parti.join('\n\n');
+}
+
+// --- ultime sessioni e filoni (0.1.5) ---
+const GRANDE_BYTE = 2 * 1024 * 1024;   // oltre: riprendere ricarica molto contesto
+const VECCHIA_GIORNI = 7;
+
+// '2026-11-20 20:45:34' (UTC, come lo salva FerdiScope) -> ms, oppure NaN
+function istante(ts) {
+  if (typeof ts !== 'string' || !ts) return NaN;
+  const iso = ts.includes('T') ? ts : ts.replace(' ', 'T');
+  return Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z');
+}
+
+function eta(ts, ora) {
+  const ms = ora - istante(ts);
+  if (!Number.isFinite(ms)) return 'data ignota';
+  const ore = Math.floor(ms / 3600000);
+  if (ore < 1) return 'poco fa';
+  if (ore < 24) return `${ore} ${ore === 1 ? 'ora' : 'ore'} fa`;
+  const g = Math.floor(ore / 24);
+  return `${g} ${g === 1 ? 'giorno' : 'giorni'} fa`;
+}
+
+function dimensione(byte) {
+  if (!Number.isFinite(byte) || byte <= 0) return null;
+  if (byte < 1024 * 1024) return `${Math.round(byte / 1024)} KB`;
+  return `${(byte / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
+
+function corto(t, n) {
+  const s = typeof t === 'string' ? t.replace(/\s+/g, ' ').trim() : '';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+function testoSessioni(ctx, ora = Date.now()) {
+  const p = ctx && ctx.progetto;
+  const sessioni = Array.isArray(ctx && ctx.sessioni) ? ctx.sessioni : [];
+  const filoni = Array.isArray(ctx && ctx.filoni) ? ctx.filoni : [];
+  if (!p || (!sessioni.length && !filoni.length)) return '';
+  const righe = [];
+  if (sessioni.length) {
+    righe.push(`## Ultime sessioni di «${p}» (descrizioni automatiche, possono essere imprecise)`);
+    for (const s of sessioni.slice(0, 5)) {
+      const pezzi = [eta(s.fine, ora)];
+      pezzi.push(s.filone_titolo ? `filone «${s.filone_titolo}»` : 'senza filone');
+      const dim = dimensione(s.byte);
+      if (dim) pezzi.push(dim);
+      pezzi.push(`id ${String(s.id).slice(0, 8)}`);
+      const g = (ora - istante(s.fine)) / 86400000;
+      if ((Number.isFinite(s.byte) && s.byte > GRANDE_BYTE) || g > VECCHIA_GIORNI) {
+        pezzi.push('grande o vecchia → meglio nuova dal riassunto');
+      }
+      righe.push(`- ${pezzi.join(' · ')}`);
+      righe.push(`  Fatto: ${corto(s.descrizione, 170)}${s.fermata ? ` Fermata: ${corto(s.fermata, 130)}` : ''}`);
+    }
+  }
+  if (filoni.length) {
+    righe.push('', `## Filoni di «${p}»`);
+    for (const f of filoni.slice(0, 8)) {
+      const quando = f.ultima ? `, ultima ${eta(f.ultima, ora)}` : '';
+      righe.push(`- ${f.titolo} — \`${f.chiave}\` (${f.sessioni || 0} sessioni${quando})`);
+    }
+  }
+  righe.push('',
+    "Se la prima richiesta di Ferdi non dice già su cosa lavorare, chiedigli in una riga se vuole riprendere uno di questi filoni. " +
+    `Per riprendere un filone leggi il suo riassunto con \`get_memory_entries('${p}', ['<chiave del filone>'])\`, non il transcript. ` +
+    "Se vuole proprio la sessione vecchia, il comando (lo lancia lui) è `claude -r <id completo>` (cercalo con `ls ~/.claude/projects/*/<id>*`); per una sessione grande o vecchia conviene la sessione nuova dal riassunto: costa meno token.");
+  return righe.join('\n');
 }
 
 // Legge tutto stdin, con un tetto di tempo nel caso non arrivi mai la fine.
@@ -234,6 +307,7 @@ module.exports = {
   chiediContesto,
   inoltraEvento,
   testoContesto,
+  testoSessioni,
   leggiStdin,
   analizzaInput,
 };

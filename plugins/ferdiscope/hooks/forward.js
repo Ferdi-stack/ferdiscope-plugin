@@ -1,4 +1,4 @@
-// Hook di inoltro del plugin FerdiScope (PreToolUse, PostToolUse, Stop):
+// Hook di inoltro del plugin FerdiScope (UserPromptSubmit, PreToolUse, PostToolUse, Stop):
 // manda l'evento a <FERDISCOPE_URL>/hooks aggiungendo `ferdiscope_project`
 // quando la cartella sta sotto un segnaposto `.ferdiscope`. Prima dell'invio
 // lib.inoltraEvento maschera i segreti e taglia i campi oltre FERDISCOPE_MAX_CAMPO

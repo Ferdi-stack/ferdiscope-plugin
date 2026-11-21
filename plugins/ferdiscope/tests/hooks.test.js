@@ -142,6 +142,47 @@ test('session-start con server attivo e segnaposto: manda cwd, project, root e m
   }
 });
 
+test('session-start: ultime sessioni e filoni all\'avvio, non su resume', async () => {
+  const tmp = cartellaTmp();
+  fs.writeFileSync(path.join(tmp, '.ferdiscope'), 'P\n');
+  const srv = await avviaServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ progetto: 'P', registrato: true, globale: 'G', indice: 'I',
+      sessioni: [{ id: 'abc-1', fine: '2026-11-20 10:00:00', descrizione: 'Fatto il retry.', fermata: 'Finita.',
+        filone: 'filone:P:bot', filone_titolo: 'bot Telegram', byte: 1000 }],
+      filoni: [{ chiave: 'filone:P:bot', titolo: 'bot Telegram', sessioni: 3, ultima: '2026-11-20 10:00:00' }] }));
+  });
+  try {
+    const env = ambiente({ FERDISCOPE_URL: `http://127.0.0.1:${srv.porta}` });
+    const avvio = contesto((await esegui(SESSION_START, JSON.stringify({ cwd: tmp, source: 'startup' }), env)).out);
+    assert.ok(avvio.includes('## Ultime sessioni di «P»'));
+    assert.ok(avvio.includes('id abc-1'));
+    assert.ok(avvio.includes('`filone:P:bot` (3 sessioni'));
+    const ripresa = contesto((await esegui(SESSION_START, JSON.stringify({ cwd: tmp, source: 'resume' }), env)).out);
+    assert.ok(ripresa.includes('## indice:P\nI'));
+    assert.ok(!ripresa.includes('Ultime sessioni'));
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('forward inoltra anche UserPromptSubmit, con il prompt mascherato', async () => {
+  const tmp = cartellaTmp();
+  const srv = await avviaServer((req, res) => { res.writeHead(200); res.end('{}'); });
+  try {
+    const evento = { session_id: 's9', cwd: tmp, hook_event_name: 'UserPromptSubmit',
+      prompt: 'usa la chiave sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA per il test' };
+    const r = await esegui(FORWARD, JSON.stringify(evento), ambiente({ FERDISCOPE_URL: `http://127.0.0.1:${srv.porta}` }));
+    assert.strictEqual(r.codice, 0);
+    const corpo = JSON.parse(srv.richieste[0].corpo);
+    assert.strictEqual(corpo.hook_event_name, 'UserPromptSubmit');
+    assert.ok(!corpo.prompt.includes('sk-ant-api03-AAAA'));
+    assert.match(corpo.prompt, /MASCHERATO/);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
 // --- forward.js ---
 
 test('forward con cwd sotto un segnaposto: POST /hooks con ferdiscope_project, niente su stdout', async () => {

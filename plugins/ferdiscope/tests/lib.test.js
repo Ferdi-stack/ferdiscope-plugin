@@ -302,3 +302,40 @@ test('maxCampo: default 20000, FERDISCOPE_MAX_CAMPO lo cambia, valori non validi
   assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: 'abc' }), 20000);
   assert.strictEqual(lib.maxCampo({ FERDISCOPE_MAX_CAMPO: '-3' }), 20000);
 });
+
+// --- testoSessioni (0.1.5) ---
+
+const ORA = Date.parse('2026-11-21T12:00:00Z');
+const CTX = {
+  progetto: 'P', registrato: true, indice: 'I',
+  sessioni: [
+    { id: 'a1', fine: '2026-11-21 10:00:00', descrizione: 'Retry aggiunto.', fermata: 'Finita.', filone_titolo: 'bot', byte: 500 * 1024 },
+    { id: 'b2', fine: '2026-11-10 10:00:00', descrizione: 'Vecchia.', fermata: '', filone_titolo: null, byte: null },
+    { id: 'c3', fine: '2026-11-20 10:00:00', descrizione: 'x'.repeat(400), fermata: 'ok', filone_titolo: 'sito', byte: 5 * 1024 * 1024 },
+  ],
+  filoni: [{ chiave: 'filone:P:bot', titolo: 'bot', sessioni: 4, ultima: '2026-11-21 10:00:00' }],
+};
+
+test('testoSessioni: età, filone, dimensione, id e consiglio per sessioni grandi o vecchie', () => {
+  const t = lib.testoSessioni(CTX, ORA);
+  const righe = t.split('\n');
+  assert.ok(righe.includes('- 2 ore fa · filone «bot» · 500 KB · id a1'));
+  assert.ok(t.includes('- 11 giorni fa · senza filone · id b2 · grande o vecchia → meglio nuova dal riassunto'));
+  assert.ok(t.includes('1 giorno fa · filone «sito» · 5,0 MB · id c3 · grande o vecchia'));
+  assert.ok(t.includes('x'.repeat(169) + '…'));
+  assert.ok(t.includes('- bot — `filone:P:bot` (4 sessioni, ultima 2 ore fa)'));
+  assert.ok(t.includes("get_memory_entries('P'"));
+});
+
+test('testoSessioni: niente sessioni né filoni, o niente progetto: stringa vuota', () => {
+  assert.strictEqual(lib.testoSessioni({ progetto: 'P', sessioni: [], filoni: [] }, ORA), '');
+  assert.strictEqual(lib.testoSessioni({ sessioni: CTX.sessioni }, ORA), '');
+  assert.strictEqual(lib.testoSessioni(null, ORA), '');
+});
+
+test('testoContesto aggiunge le sessioni solo con opzioni.sessioni', () => {
+  assert.ok(!lib.testoContesto(CTX, 'P').includes('Ultime sessioni'));
+  assert.ok(lib.testoContesto(CTX, 'P', { sessioni: true, ora: ORA }).includes('## Ultime sessioni di «P»'));
+  // server vecchio senza i campi: nessun errore, nessun blocco
+  assert.ok(!lib.testoContesto({ progetto: 'P', registrato: true, indice: 'I' }, 'P', { sessioni: true }).includes('Ultime'));
+});

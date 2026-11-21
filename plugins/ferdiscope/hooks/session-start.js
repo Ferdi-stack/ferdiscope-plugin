@@ -38,7 +38,9 @@ async function main() {
     project: segnaposto ? segnaposto.nome : null,
     root: segnaposto ? segnaposto.radice : null,
   });
-  rispondi(lib.testoContesto(ctx, segnaposto ? segnaposto.nome : null));
+  // ultime sessioni e filoni solo all'avvio vero: su resume/compact il lavoro è già in corso
+  const avvio = !input.source || input.source === 'startup' || input.source === 'clear';
+  rispondi(lib.testoContesto(ctx, segnaposto ? segnaposto.nome : null, { sessioni: avvio }));
 }
 
 main().catch(() => rispondi(NON_DISPONIBILE_RISERVA));

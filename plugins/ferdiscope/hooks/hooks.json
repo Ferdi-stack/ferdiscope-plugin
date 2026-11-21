@@ -1,5 +1,5 @@
 {
-  "description": "Memoria FerdiScope: indici all'avvio, inoltro degli eventi",
+  "description": "Memoria FerdiScope: indici e ultime sessioni all'avvio, inoltro degli eventi",
   "hooks": {
     "SessionStart": [
       {
@@ -41,6 +41,19 @@
       }
     ],
     "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/forward.js\"",
+            "async": true,
+            "timeout": 5,
+            "onFailure": "continue"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
