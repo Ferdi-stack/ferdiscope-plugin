@@ -118,3 +118,32 @@ test('troncaCampi taglia solo le stringhe oltre il tetto e lo dice', () => {
   assert.deepStrictEqual(stat, { troncati: 1, totale: 1 });
   assert.deepStrictEqual(troncaCampi({ a: 'x'.repeat(50) }, 0), { a: 'x'.repeat(50) });
 });
+
+test('il valore esatto di FERDISCOPE_TOKEN sparisce anche nudo, in JSON e in URL', () => {
+  const prima = process.env.FERDISCOPE_TOKEN;
+  const T = 'Zx9' + 'qW8eR7tY6uI5oP4aS3dF2gH1jK0lMnBvCxZ_-a';
+  process.env.FERDISCOPE_TOKEN = T;
+  try {
+    const stat = {};
+    const s = mascheraTesto(`grep -rlF '${T}' /root && curl https://x/mcp?token=${T} -H "Authorization: Bearer ${T}"`, stat);
+    assert.ok(!s.includes(T));
+    assert.strictEqual(stat['ferdiscope-token'], 3);
+    const v = mascheraValore({ tool_input: { code: `const tk='${T}';` }, altro: [T + ' x'] });
+    assert.ok(!JSON.stringify(v).includes(T));
+    assert.strictEqual(mascheraTesto('niente da vedere qui', {}), 'niente da vedere qui');
+  } finally {
+    if (prima === undefined) delete process.env.FERDISCOPE_TOKEN; else process.env.FERDISCOPE_TOKEN = prima;
+  }
+});
+
+test('token corto o assente: nessun mascheramento esatto', () => {
+  const prima = process.env.FERDISCOPE_TOKEN;
+  process.env.FERDISCOPE_TOKEN = 'breve';
+  try {
+    assert.strictEqual(mascheraTesto('parola breve qui', {}), 'parola breve qui');
+    delete process.env.FERDISCOPE_TOKEN;
+    assert.strictEqual(mascheraTesto('parola breve qui', {}), 'parola breve qui');
+  } finally {
+    if (prima === undefined) delete process.env.FERDISCOPE_TOKEN; else process.env.FERDISCOPE_TOKEN = prima;
+  }
+});

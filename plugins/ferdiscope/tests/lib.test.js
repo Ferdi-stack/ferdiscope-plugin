@@ -339,3 +339,26 @@ test('testoContesto aggiunge le sessioni solo con opzioni.sessioni', () => {
   // server vecchio senza i campi: nessun errore, nessun blocco
   assert.ok(!lib.testoContesto({ progetto: 'P', registrato: true, indice: 'I' }, 'P', { sessioni: true }).includes('Ultime'));
 });
+
+// --- 0.1.6: testo già composto dal server e parametro avvio ---
+test('testoContesto usa ctx.testo così com\'è quando c\'è', () => {
+  const t = lib.testoContesto({ progetto: 'P', testo: 'TESTO DAL SERVER', globale: 'G', indice: 'I' }, null, { sessioni: true });
+  assert.strictEqual(t, 'TESTO DAL SERVER');
+  const vecchio = lib.testoContesto({ progetto: 'P', globale: 'G', indice: 'I' }, null, {});
+  assert.match(vecchio, /## indice:P\nI/);
+  assert.match(lib.testoContesto({ progetto: 'P', testo: '   ', indice: 'I' }, null, {}), /## indice:P/);
+});
+
+test('chiediContesto manda avvio=0 solo su resume/compact', async () => {
+  const viste = [];
+  const http = require('node:http');
+  const srv = http.createServer((req, res) => { viste.push(req.url); res.setHeader('Content-Type', 'application/json'); res.end('{"testo":"x"}'); });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  try {
+    const url = 'http://127.0.0.1:' + srv.address().port;
+    await lib.chiediContesto({ url, token: null }, { cwd: '/x', avvio: false });
+    await lib.chiediContesto({ url, token: null }, { cwd: '/x', avvio: true });
+    assert.match(viste[0], /avvio=0/);
+    assert.ok(!/avvio=/.test(viste[1]), viste[1]);
+  } finally { srv.close(); }
+});

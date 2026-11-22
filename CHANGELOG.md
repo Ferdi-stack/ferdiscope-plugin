@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 — 2026-11-22
+- SessionStart: se FerdiScope manda `testo` in `/api/context` (già composto, al massimo 1900 byte: regole essenziali, indice del progetto, ultime sessioni), il plugin passa quello così com'è; `indice:globale`, aree e filoni si leggono su richiesta. Prima il contesto superava i 15 KB e Claude Code ne mostrava solo l'inizio. Su resume/compact chiede `avvio=0` (niente sessioni). Con un server vecchio il testo resta quello di 0.1.5.
+- hooks: `hooks/maschera.js` maschera anche il valore esatto di `FERDISCOPE_TOKEN`, ovunque compaia (di nuovo copia identica di `src/maschera.js` del server).
+
 ## 0.1.5 — 2026-11-21
 - SessionStart: all'avvio vero (`source` startup o clear, non resume/compact) aggiunge le ultime 5 sessioni del progetto (età, filone, dimensione, id, cosa è stato fatto e dove si è fermata) e i filoni con la chiave del riassunto; Claude chiede se riprendere un filone, e per sessioni oltre 2 MB o più vecchie di 7 giorni consiglia una sessione nuova dal riassunto. Richiede FerdiScope con `sessioni`/`filoni` in `/api/context`; con un server vecchio il testo resta quello di prima.
 - hooks: inoltra anche `UserPromptSubmit` (stesso mascheramento dei segreti), così le descrizioni automatiche delle sessioni del PC vedono le richieste di Ferdi.

@@ -33,13 +33,14 @@ async function main() {
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
   const segnaposto = lib.trovaSegnaposto(cwd);
   const cfg = lib.config(process.env);
+  // ultime sessioni e filoni solo all'avvio vero: su resume/compact il lavoro è già in corso
+  const avvio = !input.source || input.source === 'startup' || input.source === 'clear';
   const ctx = await lib.chiediContesto(cfg, {
     cwd,
     project: segnaposto ? segnaposto.nome : null,
     root: segnaposto ? segnaposto.radice : null,
+    avvio,
   });
-  // ultime sessioni e filoni solo all'avvio vero: su resume/compact il lavoro è già in corso
-  const avvio = !input.source || input.source === 'startup' || input.source === 'clear';
   rispondi(lib.testoContesto(ctx, segnaposto ? segnaposto.nome : null, { sessioni: avvio }));
 }
 

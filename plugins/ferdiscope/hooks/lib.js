@@ -138,8 +138,9 @@ async function chiamata(url, opzioni, timeoutMs) {
 async function chiediContesto(cfg, dati, timeoutMs = TIMEOUT_MS) {
   try {
     if (!destinazioneAmmessa(cfg)) return null;
-    const { cwd, project, root } = dati || {};
+    const { cwd, project, root, avvio } = dati || {};
     const parti = [];
+    if (avvio === false) parti.push('avvio=0');
     if (cwd) parti.push('cwd=' + encodeURIComponent(cwd));
     if (project) parti.push('project=' + encodeURIComponent(project));
     if (root) parti.push('root=' + encodeURIComponent(root));
@@ -171,8 +172,10 @@ async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS, max = MAX_CAMP
 }
 
 // opzioni.sessioni: aggiunge ultime sessioni e filoni (solo all'avvio vero, non su resume/compact).
+// 0.1.6: se il server manda `testo` (già composto, entro 1900 byte) si usa quello così com'è.
 function testoContesto(ctx, nomeSegnaposto, opzioni = {}) {
   if (!ctx || typeof ctx !== 'object') return NON_DISPONIBILE;
+  if (typeof ctx.testo === 'string' && ctx.testo.trim()) return ctx.testo;
   const parti = [REGOLE];
   if (ctx.globale) parti.push(`## indice:globale\n${ctx.globale}`);
   const p = ctx.progetto;

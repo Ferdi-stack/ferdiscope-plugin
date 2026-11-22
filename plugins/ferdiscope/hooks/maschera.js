@@ -41,6 +41,18 @@ const REGOLE = [
 // solo chiavi a forma di identificatore, non testi liberi usati come chiave.
 const CHIAVE_SEGRETA = /^[\w.-]{0,60}(password|passwd|secret|token(?!s)|api_?key)[\w.-]{0,60}$/i;
 
+// Valori esatti da mascherare sempre, ovunque compaiano (anche "nudi", senza un
+// nome attorno che li tradisca): il token di FerdiScope. Letto a ogni chiamata,
+// così dopo una rotazione basta il riavvio. Sotto i 16 caratteri si ignora.
+function valoriEsatti() {
+  try {
+    const t = process.env.FERDISCOPE_TOKEN;
+    return typeof t === 'string' && t.length >= 16 ? [t] : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 function conta(stat, tipo, n) {
   if (!stat || !n) return;
   stat[tipo] = (stat[tipo] || 0) + n;
@@ -51,6 +63,13 @@ function conta(stat, tipo, n) {
 function mascheraTesto(s, stat) {
   if (typeof s !== 'string' || s.length < 8) return s;
   let out = s;
+  for (const v of valoriEsatti()) {
+    const pezzi = out.split(v);
+    if (pezzi.length > 1) {
+      out = pezzi.join(SEGNO('ferdiscope-token'));
+      conta(stat, 'ferdiscope-token', pezzi.length - 1);
+    }
+  }
   for (const [tipo, re, sost] of REGOLE) {
     re.lastIndex = 0;
     let n = 0;
