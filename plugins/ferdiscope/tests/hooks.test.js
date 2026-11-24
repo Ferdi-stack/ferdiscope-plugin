@@ -257,3 +257,22 @@ test('forward: segreti mascherati e campi oltre FERDISCOPE_MAX_CAMPO tagliati pr
     await srv.chiudi();
   }
 });
+
+// --- 0.1.7: avviso del server ---
+test('forward.js: stampa systemMessage solo se il server manda un avviso', async () => {
+  let risposta = { ok: true };
+  const srv = http.createServer((q, r) => { q.resume(); q.on('end', () => r.end(JSON.stringify(risposta))); });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  try {
+    const env = ambiente({ FERDISCOPE_URL: `http://127.0.0.1:${srv.address().port}` });
+    const ev = JSON.stringify({ hook_event_name: 'Stop', session_id: 's', cwd: os.tmpdir() });
+    const senza = await esegui(FORWARD, ev, env);
+    assert.strictEqual(senza.out, '');
+    risposta = { ok: true, avviso: 'soglia superata' };
+    const con = await esegui(FORWARD, ev, env);
+    assert.strictEqual(con.codice, 0);
+    assert.match(JSON.parse(con.out).systemMessage, /^soglia superata /);
+  } finally {
+    srv.close();
+  }
+});

@@ -156,7 +156,7 @@ async function chiediContesto(cfg, dati, timeoutMs = TIMEOUT_MS) {
 
 // POST <url>/hooks con l'evento, dopo preparaEvento (segreti mascherati, campi
 // lunghi tagliati). Niente richiesta verso URL non locali senza token o non https.
-// Non lancia mai; restituisce true se il server ha risposto 2xx.
+// Non lancia mai; restituisce true se il server ha risposto 2xx, oppure {avviso} se il server ne manda uno.
 async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS, max = MAX_CAMPO_DEFAULT) {
   try {
     if (!destinazioneAmmessa(cfg)) return false;
@@ -165,7 +165,9 @@ async function inoltraEvento(cfg, evento, timeoutMs = TIMEOUT_MS, max = MAX_CAMP
       headers: intestazioni(cfg, { 'Content-Type': 'application/json' }),
       body: JSON.stringify(preparaEvento(evento, max)),
     }, timeoutMs);
-    return r.ok;
+    if (!r.ok) return false;
+    const risposta = analizzaInput(r.testo);
+    return risposta && typeof risposta.avviso === 'string' && risposta.avviso ? { avviso: risposta.avviso.slice(0, 1000) } : true;
   } catch (e) {
     return false;
   }

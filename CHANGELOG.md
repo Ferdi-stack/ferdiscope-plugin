@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.7 — 2026-11-24
+- hooks: se la risposta di `POST /hooks` contiene `avviso`, `forward.js` lo stampa come `systemMessage`. Essendo un hook async, l'avviso arriva a Claude al turno successivo e Claude lo riferisce a Ferdi (oggi: avviso di costo a 200k token di contesto, solo sessioni sulla VPS). Con un server vecchio non cambia niente.
+
 ## 0.1.6 — 2026-11-22
 - SessionStart: se FerdiScope manda `testo` in `/api/context` (già composto, al massimo 1900 byte: regole essenziali, indice del progetto, ultime sessioni), il plugin passa quello così com'è; `indice:globale`, aree e filoni si leggono su richiesta. Prima il contesto superava i 15 KB e Claude Code ne mostrava solo l'inizio. Su resume/compact chiede `avvio=0` (niente sessioni). Con un server vecchio il testo resta quello di 0.1.5.
 - hooks: `hooks/maschera.js` maschera anche il valore esatto di `FERDISCOPE_TOKEN`, ovunque compaia (di nuovo copia identica di `src/maschera.js` del server).
