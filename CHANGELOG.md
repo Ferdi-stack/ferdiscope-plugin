@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.8 — 2026-11-24
+- skill ferdiscope-memoria: `get_memory_entries` anche come elenco (senza `keys`), tetto di 12.000 caratteri senza tagliare i valori, `set_memory_entries` con `type`, `activity_summary`; `indice:globale` corto e aree `area:globale:*` su richiesta. I tool vecchi sono deprecati fino al 2026-12-24. Hook invariati. Richiede il server FerdiScope del 2026-11-24.
+
 ## 0.1.7 — 2026-11-24
 - hooks: se la risposta di `POST /hooks` contiene `avviso`, `forward.js` lo stampa come `systemMessage`. Essendo un hook async, l'avviso arriva a Claude al turno successivo e Claude lo riferisce a Ferdi (oggi: avviso di costo a 200k token di contesto, solo sessioni sulla VPS). Con un server vecchio non cambia niente.
 

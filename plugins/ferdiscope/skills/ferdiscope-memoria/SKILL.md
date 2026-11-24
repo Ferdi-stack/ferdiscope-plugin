@@ -7,25 +7,27 @@ description: Da usare quando si legge o si aggiorna la memoria FerdiScope di un 
 
 ## In breve
 
-FerdiScope tiene, per ogni progetto, un **indice** e delle **aree** fatte di righe tipizzate. All'avvio l'hook del plugin mette nel contesto le regole, `## indice:globale` e `## indice:<progetto>`. Le aree non sono caricate: si leggono, tutte insieme, quando il lavoro le tocca. La memoria si aggiorna **una volta per sessione**, correggendo le righe dell'area, non aggiungendo resoconti.
+FerdiScope tiene, per ogni progetto, un **indice** e delle **aree** fatte di righe tipizzate. All'avvio l'hook del plugin mette nel contesto le regole e `## indice:<progetto>`. `indice:globale`, aree e filoni non sono caricati: si leggono, tutti insieme, quando il lavoro li tocca. La memoria si aggiorna **una volta per sessione**, correggendo le righe dell'area, non aggiungendo resoconti.
 
 ## Chiavi
 
 | Chiave | Cosa contiene | Quando si legge |
 |---|---|---|
-| `indice:globale` (progetto `FerdiScope`) | i progetti di Ferdi | già nel contesto |
+| `indice:globale` (progetto `FerdiScope`) | elenco corto dei progetti di Ferdi | quando serve un altro progetto; nelle cartelle senza progetto è già nel contesto |
+| `area:globale:<area>` (progetto `FerdiScope`) | progetti, vps, accessi, strumenti, dispositivi | quando il lavoro tocca la macchina, gli accessi o un dispositivo |
 | `indice:<progetto>` | stato in breve, elenco delle aree | già nel contesto |
 | `area:<progetto>:<area>` | sezioni Cosa copre / Stato / Trappole / Decisioni / Da fare | quando il lavoro tocca quell'area |
 | `storia:<progetto>:<area>` | righe `[S data]` che non valgono più | **mai di default**: solo se serve capire il passato |
 
 ## Strumenti (server MCP FerdiScope)
 
-I nomi sono gli stessi sul connettore claude.ai (`mcp__claude_ai_FerdiScope__…`) e su quello locale (`mcp__ferdiscope__…`).
+I nomi sono gli stessi sul connettore claude.ai (`mcp__claude_ai_FerdiScope__…`, PC) e su quello locale (`mcp__ferdiscope__…`, VPS).
 
 **Leggere**
 - `get_memory_entries(project_name, keys[])`: legge più chiavi in una chiamata. È il modo normale di leggere: le chiavi che servono si chiedono tutte insieme. Una chiave che non c'è torna come `(not found)`.
-- `get_memory_entry(project_name, key)`: una chiave sola.
-- `get_project_memory`: scarica tutta la memoria. Sui progetti grandi supera il limite di una risposta: non usarlo.
+- Senza `keys`, `get_memory_entries(project_name)` dà l'elenco compatto delle chiavi (lunghezza, data, inizio); si restringe con `prefix` (es. `"area:"`) o `type`, si continua con `after`.
+- I valori non sono mai tagliati. Oltre 12.000 caratteri la risposta elenca le chiavi non incluse: richiamale con `keys`.
+- Sessioni ed eventi: `get_recent_sessions`, poi `get_hook_events` (una riga per evento, `before_id` per continuare, `event_id` per il payload). Conteggi già fatti: `activity_summary`.
 
 **Scrivere**
 - `edit_memory(project_name, edits[])`: cambia **singole righe** di chiavi che esistono già. È il modo normale di aggiornare. Ogni elemento di `edits` è `{ key, ops: [...] }`; le operazioni:
@@ -35,8 +37,9 @@ I nomi sono gli stessi sul connettore claude.ai (`mcp__claude_ai_FerdiScope__…
   - `{ op: "remove", match }`: toglie una riga (per i doppioni; ciò che non è più vero va con `to_history`).
 
   `match` è un pezzo di testo che deve stare in **una sola** riga (della sezione, se dai `section`): scegline uno distintivo, per esempio il comando di verifica o le prime parole. Se una riga non si trova, o se ne trovano due, non viene scritto niente e la risposta dice perché: correggi `match` e rimanda tutto. Le modifiche partono dal valore salvato in quel momento, quindi non cancellano ciò che un altro dispositivo ha scritto nel frattempo. La risposta contiene il testo risultante di ogni chiave (o solo le lunghezze con `echo: "none"`) e le righe aggiunte in storia.
-- `set_project_memory(project_name, key, value)`: sostituisce **tutto** il valore. Serve solo per creare una chiave nuova o per ristrutturarla davvero.
-- `set_memory_entries(project_name, entries[])`: come sopra per più chiavi, in una transazione.
+- `set_memory_entries(project_name, entries[])`: sostituisce **tutto** il valore di una o più chiavi, in una transazione. Serve solo per creare chiavi nuove o ristrutturarle davvero. Con `type` il valore (JSON) è validato; gli schemi sono nella chiave `schema:tipi` del progetto `FerdiScope`.
+
+I tool vecchi (`get_memory_entry`, `get_project_memory`, `get_typed_memory`, `set_project_memory`, `set_project_memory_typed`, `save_session_summary`) sono deprecati fino al 2026-12-24: non usarli.
 
 Tutte le scritture rispondono con tipo e lunghezza del valore salvato (`text, N chars`). Se il tipo non è `text`, la risposta lo segnala: riscrivi e avvisa Ferdi. **Non serve rileggere** dopo aver scritto.
 
@@ -108,10 +111,10 @@ Il file `.ferdiscope` nella cartella radice contiene una riga: il nome del proge
 | Usare un `[F]` scaduto come vero | Rilanciare la verifica, poi usarlo |
 | Trattare `[P]`/`[I]` come fatti | Sono possibilità e intenzioni |
 | Cancellare una riga non più vera | Spostarla in `storia:` come `[S data]` |
-| Riscrivere un'area intera con `set_project_memory` per cambiare qualche riga | `edit_memory` con le sole righe cambiate |
-| Scrivere solo le righe nuove con `set_project_memory` | La chiave viene sostituita: per le righe c'è `edit_memory` |
+| Riscrivere un'area intera con `set_memory_entries` per cambiare qualche riga | `edit_memory` con le sole righe cambiate |
+| Scrivere solo le righe nuove con `set_memory_entries` | La chiave viene sostituita: per le righe c'è `edit_memory` |
 | Rileggere una chiave dopo averla scritta | La risposta della scrittura dice già cosa è stato salvato |
 | Aggiornare la stessa area a ogni giro di lavoro | Una volta, quando Ferdi chiude o lo chiede |
 | Leggere le aree una chiamata alla volta | Una `get_memory_entries` con tutte le chiavi |
-| `get_project_memory` per "vedere cosa c'è" | `get_memory_entry` della chiave che serve |
+| Leggere tutto per "vedere cosa c'è" | `get_memory_entries` senza `keys` (elenco), poi le sole chiavi che servono |
 | Leggere tutte le aree o la storia all'avvio | Solo l'area che il lavoro tocca |
