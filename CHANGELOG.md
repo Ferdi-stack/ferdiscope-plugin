@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.9 — 2026-11-25
+- skill nuove: `contesto-snello` (leggere file, cercare e lanciare comandi senza riempire il contesto) e `agenti-limitati` (massimo 3 sotto-agenti in parallelo, Sonnet per implementare, Opus per revisione e coordinamento). Hook e skill ferdiscope-memoria invariati.
+
 ## 0.1.8 — 2026-11-24
 - skill ferdiscope-memoria: `get_memory_entries` anche come elenco (senza `keys`), tetto di 12.000 caratteri senza tagliare i valori, `set_memory_entries` con `type`, `activity_summary`; `indice:globale` corto e aree `area:globale:*` su richiesta. I tool vecchi sono deprecati fino al 2026-12-24. Hook invariati. Richiede il server FerdiScope del 2026-11-24.
 
